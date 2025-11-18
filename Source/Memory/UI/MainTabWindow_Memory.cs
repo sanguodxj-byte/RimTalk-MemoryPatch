@@ -245,17 +245,16 @@ namespace RimTalk.Memory.UI
             Rect elsRect = new Rect(rect.x + buttonWidth * 2, rect.y, buttonWidth - spacing, rect.height);
             string elsLabel = "ELS" + (showELS ? " ✓" : "");
             
-            // 左键切换显示
-            if (Widgets.ButtonText(elsRect, elsLabel))
-            {
-                showELS = !showELS;
-            }
-            
-            // 右键弹出菜单
+            // 优先检测右键点击（在按钮绘制之前）
             if (Mouse.IsOver(elsRect) && Event.current.type == EventType.MouseDown && Event.current.button == 1)
             {
                 Event.current.Use();
                 ShowAddMemoryContextMenu(MemoryLayer.EventLog);
+            }
+            // 左键切换显示
+            else if (Widgets.ButtonText(elsRect, elsLabel))
+            {
+                showELS = !showELS;
             }
             
             if (Mouse.IsOver(elsRect))
@@ -267,17 +266,16 @@ namespace RimTalk.Memory.UI
             Rect clpaRect = new Rect(rect.x + buttonWidth * 3, rect.y, buttonWidth - spacing, rect.height);
             string clpaLabel = "CLPA" + (showCLPA ? " ✓" : "");
             
-            // 左键切换显示
-            if (Widgets.ButtonText(clpaRect, clpaLabel))
-            {
-                showCLPA = !showCLPA;
-            }
-            
-            // 右键弹出菜单
+            // 优先检测右键点击（在按钮绘制之前）
             if (Mouse.IsOver(clpaRect) && Event.current.type == EventType.MouseDown && Event.current.button == 1)
             {
                 Event.current.Use();
                 ShowAddMemoryContextMenu(MemoryLayer.Archive);
+            }
+            // 左键切换显示
+            else if (Widgets.ButtonText(clpaRect, clpaLabel))
+            {
+                showCLPA = !showCLPA;
             }
             
             if (Mouse.IsOver(clpaRect))

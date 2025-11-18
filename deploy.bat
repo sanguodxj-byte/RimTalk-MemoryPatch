@@ -6,8 +6,8 @@ setlocal
 :: =================================================
 
 :: --- Configuration ---
-set "SOURCE_DIR=%~dp01.5\Assemblies"
-set "DEST_DIR=D:\steam\steamapps\common\RimWorld\Mods\RimTalk-MemoryPatch\Assemblies"
+set "PROJECT_DIR=%~dp0"
+set "DEST_DIR=D:\steam\steamapps\common\RimWorld\Mods\RimTalk-MemoryPatch"
 set "GAME_PROCESS=RimWorldWin64.exe"
 
 :: --- Main Logic ---
@@ -26,35 +26,60 @@ if "%ERRORLEVEL%"=="0" (
 echo [SUCCESS] RimWorld is not running.
 echo.
 
-:: 2. Check for source files
-echo [INFO] Verifying build files in %SOURCE_DIR%...
-if not exist "%SOURCE_DIR%\RimTalkMemoryPatch.dll" (
-    echo [ERROR] RimTalkMemoryPatch.dll not found. Please build the project first.
-    goto :end
+:: 2. Deploy version 1.5
+echo [INFO] Deploying version 1.5...
+if exist "%PROJECT_DIR%1.5\Assemblies\RimTalkMemoryPatch.dll" (
+    if not exist "%DEST_DIR%\1.5\Assemblies\" mkdir "%DEST_DIR%\1.5\Assemblies"
+    copy /Y "%PROJECT_DIR%1.5\Assemblies\RimTalkMemoryPatch.dll" "%DEST_DIR%\1.5\Assemblies\"
+    copy /Y "%PROJECT_DIR%1.5\Assemblies\RimTalkMemoryPatch.pdb" "%DEST_DIR%\1.5\Assemblies\" 2>NUL
+    echo [SUCCESS] Version 1.5 deployed
+) else (
+    echo [WARNING] Version 1.5 not found, skipping
 )
-if not exist "%SOURCE_DIR%\RimTalkMemoryPatch.pdb" (
-    echo [WARNING] RimTalkMemoryPatch.pdb not found. Debugging may be affected.
-)
-echo [SUCCESS] Build files found.
+
 echo.
 
-:: 3. Create destination directory if it doesn't exist
-if not exist "%DEST_DIR%\" (
-    echo [INFO] Destination directory not found. Creating:
-    echo %DEST_DIR%
-    mkdir "%DEST_DIR%"
+:: 3. Deploy version 1.6
+echo [INFO] Deploying version 1.6...
+if exist "%PROJECT_DIR%1.6\Assemblies\RimTalkMemoryPatch.dll" (
+    if not exist "%DEST_DIR%\1.6\Assemblies\" mkdir "%DEST_DIR%\1.6\Assemblies"
+    copy /Y "%PROJECT_DIR%1.6\Assemblies\RimTalkMemoryPatch.dll" "%DEST_DIR%\1.6\Assemblies\"
+    copy /Y "%PROJECT_DIR%1.6\Assemblies\RimTalkMemoryPatch.pdb" "%DEST_DIR%\1.6\Assemblies\" 2>NUL
+    echo [SUCCESS] Version 1.6 deployed
+) else (
+    echo [WARNING] Version 1.6 not found, skipping
 )
 
-:: 4. Copy files
-echo [INFO] Copying files to destination...
-copy /Y "%SOURCE_DIR%\RimTalkMemoryPatch.dll" "%DEST_DIR%\"
-copy /Y "%SOURCE_DIR%\RimTalkMemoryPatch.pdb" "%DEST_DIR%\"
+echo.
 
-:: 5. Verify copy
-if exist "%DEST_DIR%\RimTalkMemoryPatch.dll" (
+:: 4. Copy non-version-specific files
+echo [INFO] Copying shared files (About, Defs, Languages, etc.)...
+xcopy /Y /E /I "%PROJECT_DIR%About" "%DEST_DIR%\About" >NUL
+xcopy /Y /E /I "%PROJECT_DIR%Defs" "%DEST_DIR%\Defs" >NUL
+xcopy /Y /E /I "%PROJECT_DIR%Languages" "%DEST_DIR%\Languages" >NUL
+xcopy /Y /E /I "%PROJECT_DIR%Textures" "%DEST_DIR%\Textures" >NUL
+copy /Y "%PROJECT_DIR%LICENSE" "%DEST_DIR%\" 2>NUL
+
+echo [SUCCESS] Shared files deployed
+echo.
+
+:: 5. Verify deployment
+set "DEPLOY_OK=1"
+if not exist "%DEST_DIR%\1.5\Assemblies\RimTalkMemoryPatch.dll" (
+    if not exist "%DEST_DIR%\1.6\Assemblies\RimTalkMemoryPatch.dll" (
+        echo [ERROR] No valid deployment found!
+        set "DEPLOY_OK=0"
+    )
+)
+
+if "%DEPLOY_OK%"=="1" (
+    echo [SUCCESS] ===================================
     echo [SUCCESS] Deployment complete!
+    echo [SUCCESS] ===================================
+    echo.
+    echo Deployed to: %DEST_DIR%
 ) else (
-    echo [ERROR] Failed to copy files. Please check permissions.
+    echo [ERROR] Deployment failed. Please check the build output.
 )
 
 :end
