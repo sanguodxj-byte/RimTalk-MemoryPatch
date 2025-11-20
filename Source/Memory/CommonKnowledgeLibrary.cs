@@ -303,15 +303,15 @@ namespace RimTalk.Memory
             if (scoredEntries.Count == 0)
                 return string.Empty;
 
-            // 格式化为注入文本
+            // 格式化为system rule的简洁格式
             var sb = new StringBuilder();
-            sb.AppendLine("## 背景常识");
-            sb.AppendLine();
 
+            int index = 1;
             foreach (var scored in scoredEntries)
             {
                 var entry = scored.Entry;
-                sb.AppendLine($"- [{entry.tag}] {entry.content}");
+                sb.AppendLine($"{index}. [{entry.tag}] {entry.content}");
+                index++;
             }
 
             return sb.ToString();

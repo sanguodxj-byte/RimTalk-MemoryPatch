@@ -25,6 +25,11 @@ namespace RimTalk.MemoryPatch
         public bool useAISummarization = true;        // 使用 AI 总结
         public int maxSummaryLength = 80;             // 最大总结长度
         
+        // CLPA 归档设置（归属于AI总结功能）
+        public bool enableAutoArchive = true;         // 启用 CLPA 自动归档
+        public int archiveIntervalDays = 7;           // 归档间隔天数（3-30天）
+        public int maxArchiveMemories = 30;           // CLPA 最大容量（超过后自动清理最旧的）
+
         // === 独立 AI 配置 ===
         public bool useRimTalkAIConfig = true;        // 优先使用 RimTalk 的 AI 配置（默认开启）
         public string independentApiKey = "";         // 独立 API Key
@@ -38,6 +43,11 @@ namespace RimTalk.MemoryPatch
         // 记忆类型开关
         public bool enableActionMemory = true;        // 行动记忆（工作、战斗）
         public bool enableConversationMemory = true;  // 对话记忆（RimTalk对话内容）
+        
+        // === 对话缓存设置 ===
+        public bool enableConversationCache = true;   // 启用对话缓存
+        public int conversationCacheSize = 100;       // 缓存大小（50-500）
+        public int conversationCacheExpireDays = 7;   // 过期天数（1-30）
 
         // === 动态注入设置 ===
         public bool useDynamicInjection = true;       // 使用动态注入（默认开启）
@@ -77,28 +87,38 @@ namespace RimTalk.MemoryPatch
             Scribe_Values.Look(ref useAISummarization, "fourLayer_useAISummarization", true);
             Scribe_Values.Look(ref maxSummaryLength, "fourLayer_maxSummaryLength", 80);
             
-            // 独立 AI 配置
-            Scribe_Values.Look(ref useRimTalkAIConfig, "ai_useRimTalkConfig", true);
-            Scribe_Values.Look(ref independentApiKey, "ai_independentApiKey", "");
-            Scribe_Values.Look(ref independentApiUrl, "ai_independentApiUrl", "");
-            Scribe_Values.Look(ref independentModel, "ai_independentModel", "gpt-3.5-turbo");
-            Scribe_Values.Look(ref independentProvider, "ai_independentProvider", "OpenAI");
-            
-            // UI 设置
-            Scribe_Values.Look(ref enableMemoryUI, "memoryPatch_enableMemoryUI", true);
-            
-            // 记忆类型开关
-            Scribe_Values.Look(ref enableActionMemory, "memoryPatch_enableActionMemory", true);
-            Scribe_Values.Look(ref enableConversationMemory, "memoryPatch_enableConversationMemory", true);
-            
-            // 动态注入设置
-            Scribe_Values.Look(ref useDynamicInjection, "dynamic_useDynamicInjection", true);
-            Scribe_Values.Look(ref maxInjectedMemories, "dynamic_maxInjectedMemories", 10);
-            Scribe_Values.Look(ref maxInjectedKnowledge, "dynamic_maxInjectedKnowledge", 5);
-            Scribe_Values.Look(ref weightTimeDecay, "dynamic_weightTimeDecay", 0.3f);
-            Scribe_Values.Look(ref weightImportance, "dynamic_weightImportance", 0.3f);
-            Scribe_Values.Look(ref weightKeywordMatch, "dynamic_weightKeywordMatch", 0.4f);
-        }
+            // CLPA 归档设置
+            Scribe_Values.Look(ref enableAutoArchive, "fourLayer_enableAutoArchive", true);
+            Scribe_Values.Look(ref archiveIntervalDays, "fourLayer_archiveIntervalDays", 7);
+            Scribe_Values.Look(ref maxArchiveMemories, "fourLayer_maxArchiveMemories", 30);
+
+        // === 独立 AI 配置 ===
+        Scribe_Values.Look(ref useRimTalkAIConfig, "ai_useRimTalkConfig", true);
+        Scribe_Values.Look(ref independentApiKey, "ai_independentApiKey", "");
+        Scribe_Values.Look(ref independentApiUrl, "ai_independentApiUrl", "");
+        Scribe_Values.Look(ref independentModel, "ai_independentModel", "gpt-3.5-turbo");
+        Scribe_Values.Look(ref independentProvider, "ai_independentProvider", "OpenAI");
+        
+        // UI 设置
+        Scribe_Values.Look(ref enableMemoryUI, "memoryPatch_enableMemoryUI", true);
+        
+        // 记忆类型开关
+        Scribe_Values.Look(ref enableActionMemory, "memoryPatch_enableActionMemory", true);
+        Scribe_Values.Look(ref enableConversationMemory, "memoryPatch_enableConversationMemory", true);
+        
+        // 对话缓存设置
+        Scribe_Values.Look(ref enableConversationCache, "cache_enableConversationCache", true);
+        Scribe_Values.Look(ref conversationCacheSize, "cache_conversationCacheSize", 100);
+        Scribe_Values.Look(ref conversationCacheExpireDays, "cache_conversationCacheExpireDays", 7);
+        
+        // 动态注入设置
+        Scribe_Values.Look(ref useDynamicInjection, "dynamic_useDynamicInjection", true);
+        Scribe_Values.Look(ref maxInjectedMemories, "dynamic_maxInjectedMemories", 10);
+        Scribe_Values.Look(ref maxInjectedKnowledge, "dynamic_maxInjectedKnowledge", 5);
+        Scribe_Values.Look(ref weightTimeDecay, "dynamic_weightTimeDecay", 0.3f);
+        Scribe_Values.Look(ref weightImportance, "dynamic_weightImportance", 0.3f);
+        Scribe_Values.Look(ref weightKeywordMatch, "dynamic_weightKeywordMatch", 0.4f);
+    }
 
         public void DoSettingsWindowContents(Rect inRect)
         {
@@ -180,16 +200,8 @@ namespace RimTalk.MemoryPatch
                 () => DrawMemoryTypesSettings(listingStandard)
             );
 
-            // === 其他设置 ===
-            Text.Font = GameFont.Medium;
-            listingStandard.Label("其他设置");
-            Text.Font = GameFont.Small;
-            
-            listingStandard.CheckboxLabeled("启用记忆界面", ref enableMemoryUI);
-            
+            // 调试工具
             listingStandard.Gap();
-            
-            // 注入内容预览器
             Text.Font = GameFont.Small;
             GUI.color = new Color(1f, 0.9f, 0.7f);
             listingStandard.Label("调试工具：");
@@ -203,11 +215,6 @@ namespace RimTalk.MemoryPatch
             
             GUI.color = Color.gray;
             listingStandard.Label("实时查看将要注入给AI的记忆和常识（需进入游戏）");
-            GUI.color = Color.white;
-            
-            listingStandard.Gap();
-            GUI.color = Color.gray;
-            listingStandard.Label("提示：本 Mod 完全独立，不依赖 RimTalk");
             GUI.color = Color.white;
 
             listingStandard.End();
@@ -336,33 +343,30 @@ namespace RimTalk.MemoryPatch
         /// </summary>
         private void DrawSummarizationSettings(Listing_Standard listing)
         {
-            listing.CheckboxLabeled("启用每日总结（SCM → ELS）", ref enableDailySummarization);
+            listing.CheckboxLabeled("启用ELS总结（SCM → ELS）", ref enableDailySummarization);
             
             if (enableDailySummarization)
             {
                 GUI.color = new Color(0.8f, 0.8f, 1f);
-                listing.Label($"  触发条件：每天 {summarizationHour}:00（游戏时间）");
+                listing.Label($"  触发时间：每天 {summarizationHour}:00（游戏时间）");
                 GUI.color = Color.white;
                 summarizationHour = (int)listing.Slider(summarizationHour, 0, 23);
-                
-                GUI.color = Color.gray;
-                listing.Label("  说明：每天到达设定时间时，自动将 SCM 记忆总结为 ELS");
-                GUI.color = Color.white;
             }
             
             listing.Gap();
-            listing.CheckboxLabeled("使用 AI 总结", ref useAISummarization);
+            listing.Label($"最大总结长度: {maxSummaryLength} 字");
+            maxSummaryLength = (int)listing.Slider(maxSummaryLength, 50, 200);
+
+            listing.Gap();
+            // CLPA 归档设置
+            listing.CheckboxLabeled("启用 CLPA 自动归档", ref enableAutoArchive);
             
-            if (useAISummarization)
+            if (enableAutoArchive)
             {
-                listing.Label($"  最大总结长度: {maxSummaryLength} 字");
-                maxSummaryLength = (int)listing.Slider(maxSummaryLength, 50, 200);
-            }
-            else
-            {
-                GUI.color = Color.yellow;
-                listing.Label("  使用简单规则总结（不消耗 token）");
+                GUI.color = new Color(0.8f, 1f, 0.8f);
+                listing.Label($"  归档间隔：每 {archiveIntervalDays} 天");
                 GUI.color = Color.white;
+                archiveIntervalDays = (int)listing.Slider(archiveIntervalDays, 3, 30);
             }
         }
 

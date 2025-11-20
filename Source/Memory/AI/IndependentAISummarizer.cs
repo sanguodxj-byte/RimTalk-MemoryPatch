@@ -363,59 +363,111 @@ namespace RimTalk.Memory.AI
 
         private static async Task<string> CallAIAsync(string prompt)
         {
-            string actualUrl = apiUrl;
-            if (provider == "Google")
+            const int MAX_RETRIES = 3;
+            const int RETRY_DELAY_MS = 2000; // 2秒重试延迟
+            
+            for (int attempt = 1; attempt <= MAX_RETRIES; attempt++)
             {
-                // Replace placeholders with actual values
-                actualUrl = apiUrl.Replace("MODEL_PLACEHOLDER", model).Replace("API_KEY_PLACEHOLDER", apiKey);
-            }
-
-            Log.Message($"[AI Summarizer] Calling API: {actualUrl.Substring(0, Math.Min(60, actualUrl.Length))}...");
-
-            var request = (HttpWebRequest)WebRequest.Create(actualUrl);
-            request.Method = "POST";
-            request.ContentType = "application/json";
-            if (provider != "Google")
-            {
-                request.Headers["Authorization"] = $"Bearer {apiKey}";
-            }
-            request.Timeout = 30000;
-
-            string json = BuildJsonRequest(prompt);
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-            request.ContentLength = bodyRaw.Length;
-
-            using (var stream = await request.GetRequestStreamAsync())
-            {
-                await stream.WriteAsync(bodyRaw, 0, bodyRaw.Length);
-            }
-
-            try
-            {
-                using (var response = (HttpWebResponse)await request.GetResponseAsync())
-                using (var streamReader = new System.IO.StreamReader(response.GetResponseStream()))
+                try
                 {
-                    string responseText = await streamReader.ReadToEndAsync();
-                    return ParseResponse(responseText);
-                }
-            }
-            catch (WebException ex)
-            {
-                if (ex.Response != null)
-                {
-                    using (var errorResponse = (HttpWebResponse)ex.Response)
-                    using (var streamReader = new System.IO.StreamReader(errorResponse.GetResponseStream()))
+                    string actualUrl = apiUrl;
+                    if (provider == "Google")
                     {
-                        string errorText = streamReader.ReadToEnd();
-                        Log.Error($"[AI Summarizer] API Error: {errorResponse.StatusCode} - {errorText.Substring(0, Math.Min(200, errorText.Length))}");
+                        actualUrl = apiUrl.Replace("MODEL_PLACEHOLDER", model).Replace("API_KEY_PLACEHOLDER", apiKey);
+                    }
+
+                    if (attempt > 1)
+                    {
+                        Log.Message($"[AI Summarizer] Retry attempt {attempt}/{MAX_RETRIES}...");
+                    }
+                    else
+                    {
+                        Log.Message($"[AI Summarizer] Calling API: {actualUrl.Substring(0, Math.Min(60, actualUrl.Length))}...");
+                    }
+
+                    var request = (HttpWebRequest)WebRequest.Create(actualUrl);
+                    request.Method = "POST";
+                    request.ContentType = "application/json";
+                    if (provider != "Google")
+                    {
+                        request.Headers["Authorization"] = $"Bearer {apiKey}";
+                    }
+                    request.Timeout = 30000;
+
+                    string json = BuildJsonRequest(prompt);
+                    byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+                    request.ContentLength = bodyRaw.Length;
+
+                    using (var stream = await request.GetRequestStreamAsync())
+                    {
+                        await stream.WriteAsync(bodyRaw, 0, bodyRaw.Length);
+                    }
+
+                    using (var response = (HttpWebResponse)await request.GetResponseAsync())
+                    using (var streamReader = new System.IO.StreamReader(response.GetResponseStream()))
+                    {
+                        string responseText = await streamReader.ReadToEndAsync();
+                        string result = ParseResponse(responseText);
+                        
+                        if (attempt > 1)
+                        {
+                            Log.Message($"[AI Summarizer] ✅ Retry successful on attempt {attempt}");
+                        }
+                        
+                        return result;
                     }
                 }
-                else
+                catch (WebException ex)
                 {
-                    Log.Error($"[AI Summarizer] Network Error: {ex.Message}");
+                    bool shouldRetry = false;
+                    string errorDetail = "";
+                    
+                    if (ex.Response != null)
+                    {
+                        using (var errorResponse = (HttpWebResponse)ex.Response)
+                        using (var streamReader = new System.IO.StreamReader(errorResponse.GetResponseStream()))
+                        {
+                            string errorText = streamReader.ReadToEnd();
+                            errorDetail = errorText.Substring(0, Math.Min(200, errorText.Length));
+                            
+                            // 判断是否应该重试
+                            if (errorResponse.StatusCode == HttpStatusCode.ServiceUnavailable || // 503
+                                errorResponse.StatusCode == (HttpStatusCode)429 ||              // Too Many Requests
+                                errorResponse.StatusCode == HttpStatusCode.GatewayTimeout ||    // 504
+                                errorText.Contains("overloaded") ||
+                                errorText.Contains("UNAVAILABLE"))
+                            {
+                                shouldRetry = true;
+                            }
+                            
+                            Log.Warning($"[AI Summarizer] ⚠️ API Error (attempt {attempt}/{MAX_RETRIES}): {errorResponse.StatusCode} - {errorDetail}");
+                        }
+                    }
+                    else
+                    {
+                        errorDetail = ex.Message;
+                        Log.Warning($"[AI Summarizer] ⚠️ Network Error (attempt {attempt}/{MAX_RETRIES}): {errorDetail}");
+                        shouldRetry = true; // 网络错误也重试
+                    }
+                    
+                    // 如果是最后一次尝试或不应该重试，则失败
+                    if (attempt >= MAX_RETRIES || !shouldRetry)
+                    {
+                        Log.Error($"[AI Summarizer] ❌ Failed after {attempt} attempts. Last error: {errorDetail}");
+                        return null;
+                    }
+                    
+                    // 等待后重试
+                    await Task.Delay(RETRY_DELAY_MS * attempt); // 递增延迟：2s, 4s, 6s
                 }
-                return null;
+                catch (Exception ex)
+                {
+                    Log.Error($"[AI Summarizer] ❌ Unexpected error: {ex.GetType().Name} - {ex.Message}");
+                    return null;
+                }
             }
+            
+            return null;
         }
 
         private static string ParseResponse(string responseText)

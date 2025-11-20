@@ -31,6 +31,17 @@ namespace RimTalk.Patches
             if (!RimTalkMemoryPatchMod.Settings.enableActionMemory)
                 return;
 
+            // === 工作会话聚合 ===
+            // 先让聚合器处理这个Job
+            WorkSessionAggregator.OnJobStarted(pawn, newJob.def, newJob.targetA.Thing);
+            
+            // 如果这个Job正在被聚合器追踪，则跳过单次记录
+            // 避免生成重复的"搬运 - 木材"记忆
+            if (WorkSessionAggregator.IsJobBeingAggregated(newJob.def))
+            {
+                return; // 跳过，让聚合器处理
+            }
+            
             // Skip insignificant jobs (Bug 4: ignore wandering and standing)
             if (!IsSignificantJob(newJob.def))
                 return;
@@ -41,8 +52,25 @@ namespace RimTalk.Patches
             // Fix Bug 2: Only add target info if it's meaningful and not "TargetA"
             if (newJob.targetA.HasThing && newJob.targetA.Thing != pawn)
             {
-                string targetName = newJob.targetA.Thing.LabelShort;
-                if (!string.IsNullOrEmpty(targetName) && targetName != "TargetA")
+                Thing targetThing = newJob.targetA.Thing;
+                string targetName = "";
+                
+                // 尝试获取有意义的名称
+                if (targetThing is Blueprint blueprint)
+                {
+                    targetName = blueprint.def.entityDefToBuild?.label ?? "";
+                }
+                else if (targetThing is Frame frame)
+                {
+                    targetName = frame.def.entityDefToBuild?.label ?? "";
+                }
+                else
+                {
+                    targetName = targetThing.LabelShort ?? targetThing.def?.label ?? "";
+                }
+                
+                // 使用正则表达式过滤无意义的目标名称
+                if (!string.IsNullOrEmpty(targetName) && IsValidTargetName(targetName))
                 {
                     content = content + " - " + targetName;
                 }
@@ -50,6 +78,34 @@ namespace RimTalk.Patches
 
             float importance = GetJobImportance(newJob.def);
             memoryComp.AddMemory(content, MemoryType.Action, importance);
+        }
+        
+        /// <summary>
+        /// 检查目标名称是否有效（过滤TargetA等无意义名称）
+        /// </summary>
+        private static bool IsValidTargetName(string targetName)
+        {
+            if (string.IsNullOrEmpty(targetName))
+                return false;
+            
+            // 使用正则表达式过滤：
+            // 1. Target[A-Z] 格式 (TargetA, TargetB, TargetC)
+            if (System.Text.RegularExpressions.Regex.IsMatch(targetName, @"^Target[A-Z]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                return false;
+            
+            // 2. Target开头的任何内容 (Target, TargetInfo, TargetCustom等)
+            if (System.Text.RegularExpressions.Regex.IsMatch(targetName, @"^Target\w*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                return false;
+            
+            // 3. 纯数字名称
+            if (System.Text.RegularExpressions.Regex.IsMatch(targetName, @"^\d+$"))
+                return false;
+            
+            // 4. 只包含空格或特殊字符
+            if (System.Text.RegularExpressions.Regex.IsMatch(targetName, @"^[\s\W]+$"))
+                return false;
+            
+            return true;
         }
 
         private static bool IsSignificantJob(JobDef jobDef)

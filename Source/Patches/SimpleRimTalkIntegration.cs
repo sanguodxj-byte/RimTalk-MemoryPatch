@@ -38,12 +38,14 @@ namespace RimTalk.Memory.Patches
         /// <summary>
         /// Get conversation prompt enhanced with pawn's memories
         /// 支持动态注入和静态注入
+        /// 返回包含system_rule和user_prompt的完整结构
         /// </summary>
         public static string GetMemoryPrompt(Pawn pawn, string basePrompt)
         {
             if (pawn == null) return basePrompt;
 
             string memoryContext = "";
+            string knowledgeContext = "";
             
             // 使用动态注入或静态注入
             if (RimTalkMemoryPatchMod.Settings.useDynamicInjection)
@@ -62,17 +64,10 @@ namespace RimTalk.Memory.Patches
                     var memoryManager = Find.World?.GetComponent<MemoryManager>();
                     if (memoryManager != null)
                     {
-                        string knowledgeContext = memoryManager.CommonKnowledge.InjectKnowledge(
+                        knowledgeContext = memoryManager.CommonKnowledge.InjectKnowledge(
                             basePrompt,
                             RimTalkMemoryPatchMod.Settings.maxInjectedKnowledge
                         );
-                        
-                        if (!string.IsNullOrEmpty(knowledgeContext))
-                        {
-                            memoryContext = string.IsNullOrEmpty(memoryContext) 
-                                ? knowledgeContext 
-                                : memoryContext + "\n\n" + knowledgeContext;
-                        }
                     }
                     
                     if (Prefs.DevMode && !string.IsNullOrEmpty(memoryContext))
@@ -100,12 +95,40 @@ namespace RimTalk.Memory.Patches
                 }
             }
             
-            if (string.IsNullOrEmpty(memoryContext))
+            // 如果没有任何上下文，直接返回原始提示
+            if (string.IsNullOrEmpty(memoryContext) && string.IsNullOrEmpty(knowledgeContext))
             {
                 return basePrompt;
             }
 
-            return memoryContext + "\n\n" + basePrompt;
+            // 构建system_rule格式
+            var sb = new System.Text.StringBuilder();
+            
+            sb.AppendLine("## System Rule");
+            sb.AppendLine();
+            
+            // 常识库部分（更通用的知识）
+            if (!string.IsNullOrEmpty(knowledgeContext))
+            {
+                sb.AppendLine("### World Knowledge");
+                sb.AppendLine(knowledgeContext);
+                sb.AppendLine();
+            }
+            
+            // 角色记忆部分（个人经历）
+            if (!string.IsNullOrEmpty(memoryContext))
+            {
+                sb.AppendLine("### Character Memories");
+                sb.AppendLine(memoryContext);
+                sb.AppendLine();
+            }
+            
+            sb.AppendLine("---");
+            sb.AppendLine();
+            sb.AppendLine("## User Prompt");
+            sb.AppendLine(basePrompt);
+
+            return sb.ToString();
         }
 
         /// <summary>
@@ -153,6 +176,56 @@ namespace RimTalk.Memory.Patches
             int longTerm = memoryComp.LongTermMemories.Count;
             
             return $"{pawn.LabelShort}: {shortTerm} short-term, {longTerm} long-term memories";
+        }
+        
+        /// <summary>
+        /// 尝试从缓存获取对话（新增）
+        /// </summary>
+        public static string TryGetCachedDialogue(Pawn speaker, Pawn listener, string topic)
+        {
+            if (!RimTalkMemoryPatchMod.Settings.enableConversationCache)
+                return null;
+            
+            string cacheKey = CacheKeyGenerator.Generate(speaker, listener, topic);
+            if (string.IsNullOrEmpty(cacheKey))
+                return null;
+            
+            var cache = MemoryManager.GetConversationCache();
+            return cache.TryGet(cacheKey);
+        }
+        
+        /// <summary>
+        /// 添加对话到缓存（新增）
+        /// </summary>
+        public static void CacheDialogue(Pawn speaker, Pawn listener, string topic, string dialogue)
+        {
+            if (!RimTalkMemoryPatchMod.Settings.enableConversationCache)
+                return;
+            
+            string cacheKey = CacheKeyGenerator.Generate(speaker, listener, topic);
+            if (string.IsNullOrEmpty(cacheKey))
+                return;
+            
+            var cache = MemoryManager.GetConversationCache();
+            cache.Add(cacheKey, dialogue);
+        }
+        
+        /// <summary>
+        /// 获取缓存统计信息（新增）
+        /// </summary>
+        public static string GetCacheStats()
+        {
+            var cache = MemoryManager.GetConversationCache();
+            return cache.GetStats();
+        }
+        
+        /// <summary>
+        /// 清空对话缓存（新增）
+        /// </summary>
+        public static void ClearConversationCache()
+        {
+            var cache = MemoryManager.GetConversationCache();
+            cache.Clear();
         }
     }
 

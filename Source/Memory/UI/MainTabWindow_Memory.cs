@@ -96,8 +96,8 @@ namespace RimTalk.Memory.UI
             // 立即总结按钮（SCM → ELS）
             if (selectedPawn != null)
             {
-                Rect summarizeButtonRect = new Rect(rect.x + 470f, rect.y, 200f, 35f);
-                string summarizeLabel = "⚡ 立即总结 (SCM→ELS)";
+                Rect summarizeButtonRect = new Rect(rect.x + 470f, rect.y, 180f, 35f);
+                string summarizeLabel = "立即总结 (SCM→ELS)";
                 
                 var memoryComp = selectedPawn.TryGetComp<PawnMemoryComp>();
                 bool canSummarize = memoryComp != null && memoryComp.GetSituationalMemoryCount() > 0;
@@ -121,8 +121,8 @@ namespace RimTalk.Memory.UI
                 GUI.color = Color.white;
                 
                 // 总结所有人按钮
-                Rect summarizeAllButtonRect = new Rect(rect.x + 680f, rect.y, 160f, 35f);
-                if (Widgets.ButtonText(summarizeAllButtonRect, "⚡⚡ 总结所有殖民者"))
+                Rect summarizeAllButtonRect = new Rect(rect.x + 660f, rect.y, 180f, 35f);
+                if (Widgets.ButtonText(summarizeAllButtonRect, "总结所有殖民者"))
                 {
                     int count = 0;
                     foreach (var map in Find.Maps)
@@ -142,9 +142,9 @@ namespace RimTalk.Memory.UI
                     Messages.Message($"已为 {count} 名殖民者进行记忆总结", MessageTypeDefOf.TaskCompletion);
                 }
                 
-                // === CLPA 归档按钮（新增） ===
-                Rect archiveButtonRect = new Rect(rect.x + 500f, rect.y + 40f, 160f, 35f);
-                string archiveLabel = "📚 立即归档 (ELS→CLPA)";
+                // === CLPA 归档按钮（对齐） ===
+                Rect archiveButtonRect = new Rect(rect.x + 470f, rect.y + 40f, 180f, 35f);
+                string archiveLabel = "立即归档 (ELS→CLPA)";
                 
                 var archiveComp = selectedPawn.TryGetComp<PawnMemoryComp>();
                 bool canArchive = archiveComp != null && archiveComp.GetEventLogMemoryCount() > 0;
@@ -168,8 +168,8 @@ namespace RimTalk.Memory.UI
                 GUI.color = Color.white;
                 
                 // 归档所有人按钮（CLPA）
-                Rect archiveAllButtonRect = new Rect(rect.x + 680f, rect.y + 40f, 160f, 35f);
-                if (Widgets.ButtonText(archiveAllButtonRect, "📚📚 归档所有殖民者"))
+                Rect archiveAllButtonRect = new Rect(rect.x + 660f, rect.y + 40f, 180f, 35f);
+                if (Widgets.ButtonText(archiveAllButtonRect, "归档所有殖民者"))
                 {
                     int count = 0;
                     foreach (var map in Find.Maps)

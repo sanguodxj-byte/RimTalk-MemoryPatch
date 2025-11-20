@@ -258,7 +258,7 @@ namespace RimTalk.Memory
         }
 
         /// <summary>
-        /// 格式化记忆用于注入
+        /// 格式化记忆用于注入到System Rule
         /// </summary>
         private static string FormatMemoriesForInjection(List<ScoredMemory> scoredMemories)
         {
@@ -266,51 +266,50 @@ namespace RimTalk.Memory
                 return string.Empty;
 
             var sb = new StringBuilder();
-            sb.AppendLine("## 角色记忆");
-            sb.AppendLine();
 
-            // 按层级分组显示
+            // 按层级分组显示，但使用更简洁的格式
             var byLayer = scoredMemories.GroupBy(sm => sm.Memory.layer);
 
+            int index = 1;
             foreach (var group in byLayer.OrderBy(g => g.Key))
             {
-                string layerName = GetLayerName(group.Key);
-                sb.AppendLine($"### {layerName}");
-
                 foreach (var scored in group)
                 {
                     var memory = scored.Memory;
                     
-                    // 构建单条记忆
-                    string tags = memory.tags.Any() ? $"[{string.Join(", ", memory.tags)}]" : "";
+                    // 简洁格式，适合system rule
+                    string typeTag = GetMemoryTypeTag(memory.type);
                     string timeStr = memory.TimeAgoString;
                     
-                    sb.AppendLine($"- {tags} {memory.content} ({timeStr})");
+                    sb.AppendLine($"{index}. [{typeTag}] {memory.content} ({timeStr})");
+                    index++;
                 }
-
-                sb.AppendLine();
             }
 
             return sb.ToString();
         }
-
+        
         /// <summary>
-        /// 获取层级名称
+        /// 获取记忆类型标签
         /// </summary>
-        private static string GetLayerName(MemoryLayer layer)
+        private static string GetMemoryTypeTag(MemoryType type)
         {
-            switch (layer)
+            switch (type)
             {
-                case MemoryLayer.Active:
-                    return "当前状态";
-                case MemoryLayer.Situational:
-                    return "近期经历";
-                case MemoryLayer.EventLog:
-                    return "重要事件";
-                case MemoryLayer.Archive:
-                    return "长期记忆";
+                case MemoryType.Conversation:
+                    return "Conversation";
+                case MemoryType.Action:
+                    return "Action";
+                case MemoryType.Observation:
+                    return "Observation";
+                case MemoryType.Event:
+                    return "Event";
+                case MemoryType.Emotion:
+                    return "Emotion";
+                case MemoryType.Relationship:
+                    return "Relationship";
                 default:
-                    return "未知";
+                    return "Memory";
             }
         }
 
